@@ -10,7 +10,7 @@ Micro browser (single-user) for monitoring X/Twitter posts with speech synthesis
 - **Automatic provider fallback**: try X API first, then SociaVault.
 - **Browser TTS + ElevenLabs** integration for Hebrew playback.
 - Polling every 5s on the client, with server-side cache interval controls.
-- Visible app version (`v0.1.3`) shared between Worker + UI.
+- Visible app version (`v0.1.4`) shared between Worker + UI.
 
 ## Project layout
 
@@ -46,6 +46,7 @@ Plain (non-secret) vars are set inside `wrangler.toml`:
 - `DEFAULT_TTS_ENGINE` – `browser`, `elevenlabs`, or `none`.
 - `SOCIAVAULT_DEFAULT_HANDLE` – optional; if set, SociaVault fallback will use this handle when no `from:handle` clause
   is present in the query.
+- `ELEVENLABS_DEFAULT_VOICE_ID` – optional override for the ElevenLabs voice (defaults to their “Rachel” voice ID).
 
 ### D1 database
 

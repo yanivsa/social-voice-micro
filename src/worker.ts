@@ -1,7 +1,8 @@
-const DEFAULT_APP_VERSION = "v0.1.3";
+const DEFAULT_APP_VERSION = "v0.1.4";
 const DEFAULT_CACHE_INTERVAL_MS = 15_000;
 const DEFAULT_FALLBACK_CACHE_MS = 120_000;
 const DEFAULT_FEED_LIMIT = 20;
+const DEFAULT_ELEVENLABS_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"; // Rachel
 
 type FeedMode = "timeline" | "search";
 type ProviderName = "x" | "sociavault";
@@ -11,6 +12,7 @@ interface EnvBindings {
   X_BEARER_TOKEN?: string;
   SOCIAVAULT_API_KEY?: string;
   ELEVENLABS_API_KEY?: string;
+  ELEVENLABS_DEFAULT_VOICE_ID?: string;
   SOCIAVAULT_DEFAULT_HANDLE?: string;
   APP_VERSION?: string;
   CACHE_INTERVAL_MS?: string;
@@ -352,7 +354,11 @@ async function handleElevenLabsTTS(request: Request, env: EnvBindings, ctx: Exec
 
   const safeText = text.slice(0, 1_200); // guardrails
   const defaultVoiceId = (await getSetting(env, "default_voice_id")) as string | null;
-  const voiceId = payload.voiceId || defaultVoiceId;
+  const voiceId =
+    payload.voiceId ||
+    defaultVoiceId ||
+    env.ELEVENLABS_DEFAULT_VOICE_ID ||
+    DEFAULT_ELEVENLABS_VOICE_ID;
   if (!voiceId) {
     return jsonResponse(
       { error: { message: "voiceId not provided. Set defaultVoiceId in settings or pass in body." } },
@@ -485,12 +491,20 @@ async function fetchFromSociaVault(ctx: FetchContext): Promise<ProviderResult> {
   });
 
   if (!response.ok) {
-    const detail = await response.text();
-    throw new ProviderFetchError(
-      "sociavault",
-      `SociaVault API error: ${detail}`,
-      response.status
-    );
+    const detailText = await response.text();
+    let detailMessage = detailText;
+    try {
+      const parsed = JSON.parse(detailText);
+      if (parsed?.error) {
+        detailMessage = typeof parsed.error === "string" ? parsed.error : JSON.stringify(parsed.error);
+      }
+    } catch {
+      // ignore
+    }
+    if (/insufficient credits/i.test(detailMessage)) {
+      detailMessage = "SociaVault credits exhausted. Please top up the plan.";
+    }
+    throw new ProviderFetchError("sociavault", detailMessage, response.status);
   }
 
   const payload = (await response.json()) as Record<string, unknown>;
