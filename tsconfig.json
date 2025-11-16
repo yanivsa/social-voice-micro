@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "lib": ["ES2021"],
+    "strict": true,
+    "jsx": "preserve",
+    "types": ["@cloudflare/workers-types"],
+    "allowJs": false,
+    "isolatedModules": true,
+    "noEmit": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src"],
+  "exclude": ["node_modules"]
+}

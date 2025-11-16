@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#111" />
+    <title>Social Voice Micro Browser</title>
+    <style>
+      :root {
+        color-scheme: dark light;
+        --bg: #060606;
+        --card: #161616;
+        --card-alt: #1e1e1e;
+        --text: #f9f9f9;
+        --muted: #9da3af;
+        --accent: #1da1f2;
+        --danger: #ff6b6b;
+        --success: #4ade80;
+        --border: #2a2a2a;
+        --shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+        font-family: "Rubik", "Heebo", "Segoe UI", system-ui, sans-serif;
+      }
+
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #f4f4f5;
+          --card: #ffffff;
+          --card-alt: #f8fafc;
+          --text: #0f172a;
+          --muted: #475569;
+          --border: #e2e8f0;
+          --shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        padding: 1rem;
+        max-width: 720px;
+        margin-inline: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      header.app-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: var(--card);
+        padding: 1rem;
+        border-radius: 18px;
+        box-shadow: var(--shadow);
+      }
+
+      header h1 {
+        margin: 0;
+        font-size: 1.4rem;
+      }
+
+      header p {
+        margin: 0.2rem 0 0;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      .version-pill {
+        background: var(--card-alt);
+        padding: 0.35rem 0.75rem;
+        border-radius: 999px;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+
+      section.controls {
+        background: var(--card);
+        border-radius: 18px;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        box-shadow: var(--shadow);
+      }
+
+      .control-row {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+      }
+
+      label {
+        font-weight: 600;
+        font-size: 0.95rem;
+      }
+
+      select,
+      input,
+      button {
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: var(--card-alt);
+        color: var(--text);
+        font-size: 1rem;
+        padding: 0.65rem 0.85rem;
+        font-family: inherit;
+      }
+
+      button {
+        cursor: pointer;
+        transition: transform 150ms ease, background 150ms ease;
+      }
+
+      button:active {
+        transform: scale(0.97);
+      }
+
+      button.primary {
+        background: var(--accent);
+        color: #fff;
+        border: none;
+      }
+
+      .tts-controls,
+      .mode-controls {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .tts-controls button,
+      .mode-controls button {
+        flex: 1;
+        min-width: 120px;
+      }
+
+      #status-bar {
+        background: var(--card);
+        border-radius: 16px;
+        padding: 0.75rem 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.9rem;
+        color: var(--muted);
+        gap: 0.5rem;
+      }
+
+      #feed {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        padding-bottom: 2rem;
+      }
+
+      article.post-card {
+        background: var(--card);
+        border-radius: 18px;
+        padding: 1rem;
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        animation: fadeIn 280ms ease;
+      }
+
+      article.post-card.new-post {
+        border: 1px solid var(--accent);
+        animation: pulseIn 600ms ease;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes pulseIn {
+        0% {
+          box-shadow: 0 0 0 rgba(29, 161, 242, 0.3);
+        }
+        100% {
+          box-shadow: var(--shadow);
+        }
+      }
+
+      .post-head {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+      }
+
+      .avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid var(--border);
+        background: var(--card-alt);
+      }
+
+      .post-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+      }
+
+      .post-meta strong {
+        font-size: 1rem;
+      }
+
+      .post-meta span {
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+
+      .post-text {
+        line-height: 1.6;
+        font-size: 1.05rem;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .post-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .post-actions a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      .badge {
+        font-size: 0.8rem;
+        padding: 0.2rem 0.6rem;
+        border-radius: 999px;
+        background: var(--card-alt);
+        color: var(--muted);
+      }
+
+      #toast {
+        position: fixed;
+        bottom: 1.5rem;
+        inset-inline: 0.5rem;
+        margin-inline: auto;
+        max-width: 320px;
+        padding: 0.85rem 1rem;
+        border-radius: 16px;
+        background: rgba(0, 0, 0, 0.85);
+        color: #fff;
+        text-align: center;
+        font-size: 0.95rem;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 200ms ease;
+      }
+
+      #toast.show {
+        opacity: 1;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 2rem;
+        color: var(--muted);
+      }
+
+      @media (min-width: 640px) {
+        body {
+          padding: 2rem;
+        }
+
+        header.app-header,
+        section.controls,
+        #status-bar,
+        article.post-card {
+          border-radius: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <h1>Social Voice</h1>
+        <p>מיקרו־דפדפן אישי לפוסטים מ־X</p>
+      </div>
+      <div class="version-pill">גרסה <span id="app-version">-</span></div>
+    </header>
+
+    <section class="controls" aria-label="בקרות זרם הקול">
+      <div class="control-row">
+        <label for="mode-select">מצב זרם</label>
+        <select id="mode-select">
+          <option value="timeline">טיימליין אישי</option>
+          <option value="search">חיפוש</option>
+        </select>
+      </div>
+      <div class="control-row" id="search-row">
+        <label for="search-input">שאילתת חיפוש</label>
+        <form id="search-form">
+          <div class="mode-controls">
+            <input
+              id="search-input"
+              name="query"
+              autocomplete="off"
+              placeholder="למשל: from:twitterdev OR #Hebrew"
+            />
+            <button type="submit" class="primary">עדכן</button>
+          </div>
+        </form>
+      </div>
+      <div class="control-row">
+        <label for="tts-engine">קול וקריינות</label>
+        <div class="tts-controls">
+          <select id="tts-engine">
+            <option value="browser">דפדפן (Web Speech)</option>
+            <option value="elevenlabs">ElevenLabs</option>
+            <option value="none">ללא קול</option>
+          </select>
+          <button type="button" id="auto-read-toggle">קריאה אוטומטית כבויה</button>
+          <button type="button" id="skip-btn">הבא</button>
+          <button type="button" id="stop-btn">עצור</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="status-bar" aria-live="polite">
+      <span id="status-text">מתחבר...</span>
+      <span id="source-text"></span>
+    </section>
+
+    <main id="feed" aria-live="polite" aria-busy="false"></main>
+
+    <div id="toast" role="status" aria-live="assertive"></div>
+
+    <script>
+      const APP_VERSION = "v0.1.1";
+      const API_BASE = "/api";
+      const POLL_INTERVAL_MS = 5000;
+      const speech = "speechSynthesis" in window ? window.speechSynthesis : null;
+      const hasUtterance = typeof window.SpeechSynthesisUtterance === "function";
+      const state = {
+        mode: "timeline",
+        query: "",
+        posts: [],
+        knownIds: new Set(),
+        pollTimer: null,
+        isPolling: false,
+        autoRead: false,
+        ttsEngine: "browser",
+        ttsQueue: [],
+        speaking: false,
+        currentUtterance: null,
+        currentAudio: null,
+        speechSupported: Boolean(speech && hasUtterance),
+        voices: [],
+        preferredVoice: null,
+        meta: null,
+        pausePolling: false,
+      };
+
+      document.addEventListener("DOMContentLoaded", () => {
+        document.getElementById("app-version").textContent = APP_VERSION;
+        hydrateFromStorage();
+        initSpeech();
+        bindUI();
+        bootstrap();
+      });
+
+      function hydrateFromStorage() {
+        try {
+          const savedMode = localStorage.getItem("sv-mode");
+          const savedQuery = localStorage.getItem("sv-query");
+          const savedAutoRead = localStorage.getItem("sv-auto-read");
+          const savedEngine = localStorage.getItem("sv-tts-engine");
+          if (savedMode === "timeline" || savedMode === "search") {
+            state.mode = savedMode;
+          }
+          if (typeof savedQuery === "string") {
+            state.query = savedQuery;
+          }
+          if (savedAutoRead !== null) {
+            state.autoRead = savedAutoRead === "true";
+          }
+          if (savedEngine === "browser" || savedEngine === "elevenlabs" || savedEngine === "none") {
+            state.ttsEngine = savedEngine;
+          }
+        } catch (error) {
+          console.warn("localStorage unavailable", error);
+        }
+      }
+
+      function persistSetting(key, value) {
+        try {
+          localStorage.setItem(key, value);
+        } catch (error) {
+          console.warn("Unable to persist setting", error);
+        }
+      }
+
+      function bindUI() {
+        const modeSelect = document.getElementById("mode-select");
+        const searchRow = document.getElementById("search-row");
+        const searchInput = document.getElementById("search-input");
+        const form = document.getElementById("search-form");
+        const ttsSelect = document.getElementById("tts-engine");
+        const autoBtn = document.getElementById("auto-read-toggle");
+        const skipBtn = document.getElementById("skip-btn");
+        const stopBtn = document.getElementById("stop-btn");
+
+        modeSelect.value = state.mode;
+        searchRow.style.display = state.mode === "search" ? "flex" : "none";
+        searchInput.value = state.query;
+        ttsSelect.value = state.ttsEngine;
+        updateAutoReadButton();
+
+        modeSelect.addEventListener("change", (event) => {
+          state.mode = event.target.value;
+          persistSetting("sv-mode", state.mode);
+          searchRow.style.display = state.mode === "search" ? "flex" : "none";
+          resetFeedState();
+          scheduleImmediatePoll();
+        });
+
+        form.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const value = searchInput.value.trim();
+          state.query = value;
+          persistSetting("sv-query", value);
+          resetFeedState();
+          scheduleImmediatePoll();
+        });
+
+        ttsSelect.addEventListener("change", (event) => {
+          state.ttsEngine = event.target.value;
+          persistSetting("sv-tts-engine", state.ttsEngine);
+          if (state.ttsEngine === "none" && state.autoRead) {
+            state.autoRead = false;
+            persistSetting("sv-auto-read", "false");
+          }
+          updateAutoReadButton();
+          stopSpeech();
+        });
+
+        autoBtn.addEventListener("click", () => {
+          state.autoRead = !state.autoRead;
+          persistSetting("sv-auto-read", String(state.autoRead));
+          updateAutoReadButton();
+          if (state.autoRead) {
+            processSpeechQueue();
+          } else {
+            stopSpeech();
+          }
+        });
+
+        skipBtn.addEventListener("click", () => {
+          skipCurrentSpeech();
+        });
+
+        stopBtn.addEventListener("click", () => {
+          stopSpeech();
+          state.ttsQueue.length = 0;
+        });
+
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) {
+            clearTimeout(state.pollTimer);
+            state.pollTimer = null;
+          } else {
+            scheduleImmediatePoll();
+          }
+        });
+      }
+
+      async function bootstrap() {
+        await loadServerSettings();
+        scheduleImmediatePoll();
+      }
+
+      function scheduleImmediatePoll() {
+        clearTimeout(state.pollTimer);
+        fetchFeed().finally(() => {
+          state.pollTimer = setTimeout(loopPoll, POLL_INTERVAL_MS);
+        });
+      }
+
+      function loopPoll() {
+        fetchFeed().finally(() => {
+          state.pollTimer = setTimeout(loopPoll, POLL_INTERVAL_MS);
+        });
+      }
+
+      async function loadServerSettings() {
+        setStatus("טוען הגדרות מהשרת...");
+        try {
+          const response = await fetch(`${API_BASE}/settings`, { cache: "no-store" });
+          if (!response.ok) throw new Error("settings request failed");
+          const data = await response.json();
+          if (data.defaultMode && !localStorage.getItem("sv-mode")) {
+            state.mode = data.defaultMode;
+            document.getElementById("mode-select").value = state.mode;
+          }
+          if (data.defaultQuery && !localStorage.getItem("sv-query")) {
+            state.query = data.defaultQuery;
+            document.getElementById("search-input").value = state.query;
+          }
+          if (data.ttsEngine && !localStorage.getItem("sv-tts-engine")) {
+            state.ttsEngine = data.ttsEngine;
+            document.getElementById("tts-engine").value = state.ttsEngine;
+          }
+          if (data.version && data.version !== APP_VERSION) {
+            showToast(`קיימת גרסת שרת ${data.version}. רענן דף כדי להתעדכן.`);
+          }
+        } catch (error) {
+          console.warn("settings fetch error", error);
+          showToast("לא ניתן למשוך הגדרות. נשתמש בברירת מחדל.");
+        }
+      }
+
+      async function fetchFeed() {
+        const feedEl = document.getElementById("feed");
+        if (state.isPolling) return;
+        state.isPolling = true;
+        feedEl.setAttribute("aria-busy", "true");
+        setStatus("משיג ציוצים...");
+        const params = new URLSearchParams({ mode: state.mode, limit: "20" });
+        if (state.mode === "search") {
+          params.set("q", state.query);
+        }
+
+        try {
+          const response = await fetch(`${API_BASE}/feed?${params}`, {
+            cache: "no-store",
+          });
+          if (!response.ok) {
+            const detail = await response.json().catch(() => null);
+            throw new Error(detail?.error?.message || `Feed error ${response.status}`);
+          }
+          const data = await response.json();
+          state.meta = data.meta;
+          renderFeed(data.posts || []);
+          updateStatusMeta();
+        } catch (error) {
+          console.error("feed fetch error", error);
+          showToast("התרחשה תקלה בשליפה. ננסה שוב.");
+          setStatus("שגיאה זמנית");
+        } finally {
+          state.isPolling = false;
+          feedEl.setAttribute("aria-busy", "false");
+        }
+      }
+
+      function resetFeedState() {
+        state.posts = [];
+        state.knownIds = new Set();
+        state.ttsQueue.length = 0;
+        const feed = document.getElementById("feed");
+        if (feed) {
+          feed.innerHTML = "";
+        }
+      }
+
+      function renderFeed(posts) {
+        const feed = document.getElementById("feed");
+        if (!Array.isArray(posts) || posts.length === 0) {
+          feed.innerHTML = '<div class="empty-state">אין פוסטים זמינים כרגע.</div>';
+          return;
+        }
+
+        const existing = new Map(state.posts.map((post) => [post.id, post]));
+        const newPosts = [];
+        feed.innerHTML = "";
+
+        posts.forEach((post) => {
+          const isNew = !state.knownIds.has(post.id);
+          if (isNew) {
+            state.knownIds.add(post.id);
+            newPosts.push(post);
+          }
+          feed.appendChild(createPostCard(post, isNew));
+        });
+
+        state.posts = posts;
+        if (state.autoRead && newPosts.length) {
+          queuePostsForSpeech(newPosts);
+        }
+      }
+
+      function createPostCard(post, isNew) {
+        const card = document.createElement("article");
+        card.className = "post-card";
+        if (isNew) {
+          card.classList.add("new-post");
+          setTimeout(() => card.classList.remove("new-post"), 1200);
+        }
+        card.dataset.postId = post.id;
+
+        const head = document.createElement("div");
+        head.className = "post-head";
+
+        const avatar = document.createElement("img");
+        avatar.className = "avatar";
+        avatar.loading = "lazy";
+        avatar.alt = "";
+        avatar.src = post.avatarUrl || "https://abs.twimg.com/sticky/default_profile_images/default_profile_normal.png";
+        head.appendChild(avatar);
+
+        const meta = document.createElement("div");
+        meta.className = "post-meta";
+        const strong = document.createElement("strong");
+        strong.textContent = post.author || "משתמש";
+        const handle = document.createElement("span");
+        handle.textContent = `${post.handle || "@"} · ${formatRelative(post.createdAt)}`;
+        meta.appendChild(strong);
+        meta.appendChild(handle);
+        head.appendChild(meta);
+
+        const text = document.createElement("p");
+        text.className = "post-text";
+        text.dir = "auto";
+        text.textContent = post.text || "";
+
+        const actions = document.createElement("div");
+        actions.className = "post-actions";
+
+        const speakBtn = document.createElement("button");
+        speakBtn.type = "button";
+        speakBtn.textContent = "🔊 קרא";
+        speakBtn.addEventListener("click", () => {
+          queuePostsForSpeech([post], true);
+        });
+
+        const openLink = document.createElement("a");
+        openLink.target = "_blank";
+        openLink.rel = "noopener";
+        openLink.textContent = "פתח ב־X";
+        openLink.href = post.permalink || `https://x.com/search?q=${encodeURIComponent(post.text.slice(0, 40))}`;
+
+        const badge = document.createElement("span");
+        badge.className = "badge";
+        badge.textContent = state.meta?.provider === "x" ? "מקור: X" : state.meta?.provider === "sociavault" ? "מקור: SociaVault" : "";
+
+        actions.appendChild(speakBtn);
+        actions.appendChild(openLink);
+        actions.appendChild(badge);
+
+        card.appendChild(head);
+        card.appendChild(text);
+        card.appendChild(actions);
+
+        return card;
+      }
+
+      function updateStatusMeta() {
+        const statusText = document.getElementById("status-text");
+        const sourceText = document.getElementById("source-text");
+        if (!state.meta) {
+          statusText.textContent = "ממתין לנתונים...";
+          sourceText.textContent = "";
+          return;
+        }
+        const modeLabel = state.mode === "search" ? "חיפוש" : "טיימליין";
+        statusText.textContent = `${modeLabel} · ${new Date(state.meta.fetchedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+        const parts = [];
+        if (state.meta.provider) {
+          parts.push(state.meta.provider === "x" ? "X" : "SociaVault");
+        }
+        if (state.meta.fromCache) parts.push("מטמון");
+        if (state.meta.stale) parts.push("מיושן");
+        sourceText.textContent = parts.join(" · ");
+      }
+
+      function setStatus(text) {
+        document.getElementById("status-text").textContent = text;
+      }
+
+      function showToast(message, timeout = 3500) {
+        const toast = document.getElementById("toast");
+        toast.textContent = message;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), timeout);
+      }
+
+      function updateAutoReadButton() {
+        const btn = document.getElementById("auto-read-toggle");
+        const label = state.autoRead ? "קריאה אוטומטית פעילה" : "קריאה אוטומטית כבויה";
+        btn.textContent = label;
+        btn.classList.toggle("primary", state.autoRead);
+        if (state.ttsEngine === "none") {
+          btn.disabled = true;
+          btn.title = "בחר מנוע קול כדי לאפשר קריאה";
+        } else {
+          btn.disabled = false;
+          btn.title = "";
+        }
+      }
+
+      function formatRelative(dateLike) {
+        const date = new Date(dateLike);
+        const diff = Date.now() - date.getTime();
+        const minutes = Math.floor(diff / 60000);
+        if (minutes < 1) return "עכשיו";
+        if (minutes < 60) return `${minutes} דק'`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours} שעות`;
+        const days = Math.floor(hours / 24);
+        return `${days} ימים`;
+      }
+
+      function queuePostsForSpeech(posts, prioritize = false) {
+        if (state.ttsEngine === "none") return;
+        const ordered = [...posts].sort(
+          (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+        if (prioritize) {
+          state.ttsQueue = ordered.concat(state.ttsQueue);
+        } else {
+          state.ttsQueue.push(...ordered);
+        }
+        processSpeechQueue();
+      }
+
+      function processSpeechQueue() {
+        if (!state.autoRead && state.ttsQueue.length === 0) return;
+        if (state.speaking) return;
+        const next = state.ttsQueue.shift();
+        if (!next) return;
+        speakPost(next);
+      }
+
+      function speakPost(post) {
+        if (state.ttsEngine === "browser") {
+          if (!state.speechSupported) {
+            showToast("הדפדפן לא תומך ב־Web Speech API");
+            state.ttsEngine = "none";
+            document.getElementById("tts-engine").value = "none";
+            updateAutoReadButton();
+            return;
+          }
+          speakWithBrowser(post);
+        } else if (state.ttsEngine === "elevenlabs") {
+          speakWithElevenLabs(post);
+        }
+      }
+
+      function speakWithBrowser(post) {
+        if (!hasUtterance) {
+          showToast("הדפדפן לא תומך ב־Speech Synthesis");
+          return;
+        }
+        const utterance = new SpeechSynthesisUtterance(post.text);
+        utterance.lang = detectLang(post.text);
+        if (state.preferredVoice) utterance.voice = state.preferredVoice;
+        utterance.rate = 1.05;
+        utterance.onstart = () => {
+          state.speaking = true;
+          state.currentUtterance = utterance;
+        };
+        utterance.onend = () => {
+          state.speaking = false;
+          state.currentUtterance = null;
+          processSpeechQueue();
+        };
+        utterance.onerror = () => {
+          state.speaking = false;
+          state.currentUtterance = null;
+          showToast("שגיאה במנוע הדפדפן");
+          processSpeechQueue();
+        };
+        speech?.speak(utterance);
+      }
+
+      async function speakWithElevenLabs(post) {
+        setStatus("מייצר שמע איכותי...");
+        state.speaking = true;
+        try {
+          const response = await fetch(`${API_BASE}/tts/elevenlabs`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: post.text }),
+          });
+          if (!response.ok) {
+            throw new Error("ElevenLabs request failed");
+          }
+          const buffer = await response.arrayBuffer();
+          const blob = new Blob([buffer], { type: "audio/mpeg" });
+          const url = URL.createObjectURL(blob);
+          const audio = new Audio(url);
+          state.currentAudio = audio;
+          audio.play();
+          audio.onended = () => {
+            URL.revokeObjectURL(url);
+            state.speaking = false;
+            state.currentAudio = null;
+            processSpeechQueue();
+          };
+          audio.onerror = () => {
+            URL.revokeObjectURL(url);
+            state.speaking = false;
+            state.currentAudio = null;
+            showToast("תקלה בהשמעת ElevenLabs");
+            processSpeechQueue();
+          };
+        } catch (error) {
+          console.error("ElevenLabs error", error);
+          showToast("לא הצלחנו לדבר בעזרת ElevenLabs");
+          state.speaking = false;
+          processSpeechQueue();
+        }
+      }
+
+      function skipCurrentSpeech() {
+        if (state.currentUtterance && speech) {
+          speech.cancel();
+          state.currentUtterance = null;
+          state.speaking = false;
+        }
+        if (state.currentAudio) {
+          state.currentAudio.pause();
+          state.currentAudio.currentTime = 0;
+          state.currentAudio = null;
+          state.speaking = false;
+        }
+        processSpeechQueue();
+      }
+
+      function stopSpeech() {
+        if (speech) {
+          speech.cancel();
+        }
+        if (state.currentAudio) {
+          state.currentAudio.pause();
+          state.currentAudio = null;
+        }
+        state.speaking = false;
+      }
+
+      function detectLang(text) {
+        const hebrewRegex = /[\u0590-\u05FF]/;
+        return hebrewRegex.test(text) ? "he-IL" : "en-US";
+      }
+
+      function initSpeech() {
+        if (!state.speechSupported || !speech) return;
+        const populateVoices = () => {
+          state.voices = speech.getVoices();
+          state.preferredVoice = state.voices.find((voice) => voice.lang?.startsWith("he")) || null;
+        };
+        populateVoices();
+        speech.addEventListener("voiceschanged", populateVoices);
+      }
+    </script>
+  </body>
+</html>
