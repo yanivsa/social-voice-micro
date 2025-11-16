@@ -351,7 +351,7 @@
     <div id="toast" role="status" aria-live="assertive"></div>
 
     <script>
-      const APP_VERSION = "v0.1.1";
+      const APP_VERSION = "v0.1.2";
       const API_BASE = window.location.hostname.endsWith(".pages.dev")
         ? "https://social-voice-micro.yanivsa.workers.dev/api"
         : "/api";
@@ -553,7 +553,11 @@
           });
           if (!response.ok) {
             const detail = await response.json().catch(() => null);
-            throw new Error(detail?.error?.message || `Feed error ${response.status}`);
+            const message =
+              detail?.error?.detail ||
+              detail?.error?.message ||
+              `Feed error ${response.status}`;
+            throw new Error(message);
           }
           const data = await response.json();
           state.meta = data.meta;
@@ -561,7 +565,12 @@
           updateStatusMeta();
         } catch (error) {
           console.error("feed fetch error", error);
-          showToast("התרחשה תקלה בשליפה. ננסה שוב.");
+          const msg = String(error && error.message ? error.message : error);
+          if (msg.includes("X_BEARER_TOKEN not configured") || msg.includes("SOCIAVAULT_API_KEY not configured")) {
+            showToast("חסרות הגדרות API בשרת (X / SociaVault).");
+          } else {
+            showToast("התרחשה תקלה בשליפה. ננסה שוב.");
+          }
           setStatus("שגיאה זמנית");
         } finally {
           state.isPolling = false;
@@ -799,7 +808,16 @@
             body: JSON.stringify({ text: post.text }),
           });
           if (!response.ok) {
-            throw new Error("ElevenLabs request failed");
+            let message = "ElevenLabs request failed";
+            try {
+              const detail = await response.json();
+              if (detail?.error?.message) {
+                message = detail.error.message;
+              }
+            } catch {
+              // ignore JSON parse errors
+            }
+            throw new Error(message);
           }
           const buffer = await response.arrayBuffer();
           const blob = new Blob([buffer], { type: "audio/mpeg" });
