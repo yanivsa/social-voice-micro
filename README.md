@@ -10,7 +10,7 @@ Micro browser (single-user) for monitoring X/Twitter posts with speech synthesis
 - **Automatic provider fallback**: try X API first, then SociaVault.
 - **Browser TTS + ElevenLabs** integration for Hebrew playback.
 - Polling every 5s on the client, with server-side cache interval controls.
-- Visible app version (`v0.1.0`) shared between Worker + UI.
+- Visible app version (`v0.1.3`) shared between Worker + UI.
 
 ## Project layout
 
@@ -44,6 +44,8 @@ Plain (non-secret) vars are set inside `wrangler.toml`:
 - `FALLBACK_CACHE_MS` – stale cache window when both providers fail (default 120000).
 - `DEFAULT_FEED_QUERY` – timeline query (e.g. `from:twitterdev OR #hebrew`).
 - `DEFAULT_TTS_ENGINE` – `browser`, `elevenlabs`, or `none`.
+- `SOCIAVAULT_DEFAULT_HANDLE` – optional; if set, SociaVault fallback will use this handle when no `from:handle` clause
+  is present in the query.
 
 ### D1 database
 
@@ -56,7 +58,10 @@ Plain (non-secret) vars are set inside `wrangler.toml`:
 
 ### SociaVault endpoint note
 
-`src/worker.ts` uses `https://api.sociavault.com/v1/twitter/search` as a placeholder path. Adjust it (and any required parameters/headers) according to your SociaVault plan/documentation. The normalization function is resilient to typical post fields (`id`, `text`, `author`, `username`, `avatarUrl`, `created_at`, `permalink`).
+SociaVault fallback now targets the `https://api.sociavault.com/v1/scrape/twitter/user-tweets` endpoint. Because this endpoint
+requires a specific handle, the Worker tries to extract the first `from:handle` or `@handle` token from the query. If no handle is
+found, it will use `SOCIAVAULT_DEFAULT_HANDLE` (when supplied) or skip the fallback entirely. Make sure your timeline/search
+queries include `from:handle` when you want SociaVault to kick in (for example `from:ynetalerts lang:he`).
 
 ### ElevenLabs voice defaults
 

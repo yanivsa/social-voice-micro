@@ -1,4 +1,4 @@
-const DEFAULT_APP_VERSION = "v0.1.2";
+const DEFAULT_APP_VERSION = "v0.1.3";
 const DEFAULT_CACHE_INTERVAL_MS = 15_000;
 const DEFAULT_FALLBACK_CACHE_MS = 120_000;
 const DEFAULT_FEED_LIMIT = 20;
@@ -11,6 +11,7 @@ interface EnvBindings {
   X_BEARER_TOKEN?: string;
   SOCIAVAULT_API_KEY?: string;
   ELEVENLABS_API_KEY?: string;
+  SOCIAVAULT_DEFAULT_HANDLE?: string;
   APP_VERSION?: string;
   CACHE_INTERVAL_MS?: string;
   FALLBACK_CACHE_MS?: string;
@@ -454,17 +455,27 @@ async function fetchFromX(ctx: FetchContext): Promise<ProviderResult> {
 }
 
 async function fetchFromSociaVault(ctx: FetchContext): Promise<ProviderResult> {
-  const { env, mode, query, limit } = ctx;
+  const { env, query, limit } = ctx;
   const apiKey = env.SOCIAVAULT_API_KEY;
   if (!apiKey) {
     throw new ProviderFetchError("sociavault", "SOCIAVAULT_API_KEY not configured", 500);
   }
 
-  // Placeholder endpoint - update to actual SociaVault path per account.
-  const endpoint = new URL("https://api.sociavault.com/v1/twitter/search");
-  endpoint.searchParams.set("query", query);
-  endpoint.searchParams.set("limit", String(limit));
-  endpoint.searchParams.set("mode", mode);
+  const handle =
+    extractHandleFromQuery(query) ||
+    (env.SOCIAVAULT_DEFAULT_HANDLE ? env.SOCIAVAULT_DEFAULT_HANDLE.trim() : "");
+
+  if (!handle) {
+    throw new ProviderFetchError(
+      "sociavault",
+      "SociaVault fallback requires a from:@handle query or SOCIAVAULT_DEFAULT_HANDLE.",
+      400
+    );
+  }
+
+  const endpoint = new URL("https://api.sociavault.com/v1/scrape/twitter/user-tweets");
+  endpoint.searchParams.set("handle", handle);
+  endpoint.searchParams.set("trim", "false");
 
   const response = await fetch(endpoint.toString(), {
     headers: {
@@ -482,7 +493,12 @@ async function fetchFromSociaVault(ctx: FetchContext): Promise<ProviderResult> {
     );
   }
 
-  const payload = await response.json<Record<string, unknown>>();
+  const payload = (await response.json()) as Record<string, unknown>;
+  const message = (payload as any)?.data?.message;
+  if (message && !(payload as any)?.data?.tweets) {
+    throw new ProviderFetchError("sociavault", `SociaVault API error: ${message}`, 502);
+  }
+
   const posts = normalizeSociaVaultPosts(payload, limit);
   return { provider: "sociavault", posts };
 }
@@ -511,40 +527,67 @@ function normalizeXPosts(payload: { data?: any[]; includes?: { users?: any[] } }
 }
 
 function normalizeSociaVaultPosts(payload: Record<string, unknown>, limit: number) {
-  const items =
-    (Array.isArray(payload.posts) && payload.posts) ||
-    (Array.isArray(payload.data) && payload.data) ||
-    [];
-
-  const posts: UnifiedPost[] = [];
-  for (const item of items.slice(0, limit)) {
-    if (!item || typeof item !== "object") continue;
-    const anyItem = item as Record<string, any>;
-    const username =
-      anyItem.username ||
-      anyItem.handle?.replace(/^@/, "") ||
-      anyItem.author?.username ||
-      "unknown";
-    const authorName = anyItem.author?.name || anyItem.author_name || anyItem.name || username;
-    posts.push({
-      id: String(anyItem.id ?? crypto.randomUUID()),
-      author: authorName,
-      handle: toHandle(username),
-      avatarUrl:
-        anyItem.avatarUrl ||
-        anyItem.avatar_url ||
-        anyItem.author?.profile_image_url ||
-        anyItem.profile_image_url,
-      text: String(anyItem.text ?? anyItem.content ?? ""),
-      createdAt: anyItem.created_at || new Date().toISOString(),
-      permalink:
-        anyItem.permalink ||
-        anyItem.url ||
-        (username && anyItem.id ? `https://x.com/${username}/status/${anyItem.id}` : undefined),
-    });
+  const data = (payload as any)?.data ?? payload;
+  let tweets: any[] = [];
+  if (Array.isArray(data?.tweets)) {
+    tweets = data.tweets;
+  } else if (data?.tweets && typeof data.tweets === "object") {
+    tweets = Object.values(data.tweets);
+  } else if (Array.isArray(data)) {
+    tweets = data;
   }
 
+  const posts: UnifiedPost[] = [];
+  for (const tweet of tweets) {
+    if (!tweet || typeof tweet !== "object") continue;
+    const parsed = mapSociaVaultTweet(tweet as Record<string, any>);
+    if (parsed) {
+      posts.push(parsed);
+    }
+    if (posts.length >= limit) break;
+  }
   return posts;
+}
+
+function mapSociaVaultTweet(tweet: Record<string, any>): UnifiedPost | null {
+  const userResult = tweet?.core?.user_results?.result;
+  const legacyUser = userResult?.legacy || tweet?.user;
+  const username =
+    legacyUser?.screen_name ||
+    legacyUser?.username ||
+    tweet?.legacy?.screen_name ||
+    tweet?.author?.username ||
+    "";
+  const displayName =
+    legacyUser?.name || tweet?.author?.name || username || tweet?.legacy?.user?.name || "unknown";
+  const avatarUrl =
+    legacyUser?.profile_image_url_https || legacyUser?.profile_image_url || tweet?.author?.avatar;
+
+  const text =
+    tweet?.legacy?.full_text ||
+    tweet?.legacy?.text ||
+    tweet?.note_tweet?.note_tweet_results?.result?.text ||
+    tweet?.note_tweet?.text ||
+    tweet?.text ||
+    "";
+
+  const createdAt = tweet?.legacy?.created_at
+    ? new Date(tweet.legacy.created_at).toISOString()
+    : new Date().toISOString();
+
+  const id = String(tweet?.rest_id || tweet?.legacy?.id_str || tweet?.id || crypto.randomUUID());
+  const permalink =
+    username && id ? `https://x.com/${username}/status/${tweet?.rest_id || id}` : undefined;
+
+  return {
+    id,
+    author: displayName || "unknown",
+    handle: username ? toHandle(username) : "@unknown",
+    avatarUrl,
+    text,
+    createdAt,
+    permalink,
+  };
 }
 
 async function getCachedFeed(env: EnvBindings, key: string) {
@@ -708,6 +751,15 @@ function clampLimit(limit: number) {
 
 function toHandle(username: string) {
   return username.startsWith("@") ? username : `@${username}`;
+}
+
+function extractHandleFromQuery(query: string) {
+  if (!query) return null;
+  const fromMatch = query.match(/from:([A-Za-z0-9_]+)/i);
+  if (fromMatch) return fromMatch[1];
+  const atMatch = query.match(/@([A-Za-z0-9_]+)/);
+  if (atMatch) return atMatch[1];
+  return null;
 }
 
 function getRuntimeConfig(env: EnvBindings) {
