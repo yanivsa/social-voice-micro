@@ -352,7 +352,9 @@
 
     <script>
       const APP_VERSION = "v0.1.1";
-      const API_BASE = "/api";
+      const API_BASE = window.location.hostname.endsWith(".pages.dev")
+        ? "https://social-voice-micro.yanivsa.workers.dev/api"
+        : "/api";
       const POLL_INTERVAL_MS = 5000;
       const speech = "speechSynthesis" in window ? window.speechSynthesis : null;
       const hasUtterance = typeof window.SpeechSynthesisUtterance === "function";

@@ -71,44 +71,54 @@ class ProviderFetchError extends Error {
 
 export default {
   async fetch(request: Request, env: EnvBindings, ctx: ExecutionContext) {
+    if (request.method === "OPTIONS") {
+      return handleOptions(request);
+    }
+
     const url = new URL(request.url);
 
     if (url.pathname === "/" && request.method === "GET") {
-      return new Response(
+      return withCors(
+        request,
+        new Response(
         "Social Voice Micro Browser Worker\nUse /api/feed or open the Pages-hosted index.html.",
         { status: 200, headers: { "content-type": "text/plain; charset=utf-8" } }
+        )
       );
     }
 
     if (url.pathname === "/api/feed") {
-      return handleFeedRequest(request, env);
+      return withCors(request, await handleFeedRequest(request, env));
     }
 
     if (url.pathname === "/api/settings") {
       if (request.method === "GET") {
-        return handleSettingsGet(env);
+        return withCors(request, await handleSettingsGet(env));
       }
       if (request.method === "POST") {
-        return handleSettingsPost(request, env);
+        return withCors(request, await handleSettingsPost(request, env));
       }
-      return methodNotAllowed(["GET", "POST"]);
+      return withCors(request, methodNotAllowed(["GET", "POST"]));
     }
 
     if (url.pathname === "/api/tts/elevenlabs") {
       if (request.method !== "POST") {
-        return methodNotAllowed(["POST"]);
+        return withCors(request, methodNotAllowed(["POST"]));
       }
-      return handleElevenLabsTTS(request, env, ctx);
+      return withCors(request, await handleElevenLabsTTS(request, env, ctx));
     }
 
     if (url.pathname === "/api/meta") {
-      return jsonResponse({
+      return withCors(
+        request,
+        jsonResponse({
         version: getAppVersion(env),
         now: new Date().toISOString(),
-      });
+        })
+      );
     }
 
-    return new Response("Not found", { status: 404 });
+    return withCors(request, new Response("Not found", { status: 404 }));
   },
 };
 
@@ -223,6 +233,19 @@ async function handleFeedRequest(request: Request, env: EnvBindings) {
   await logUsage(env, providerResult.provider, mode);
 
   return jsonResponse(feedResponse);
+}
+
+function handleOptions(request: Request) {
+  const origin = request.headers.get("Origin") ?? "*";
+  const headers = new Headers();
+  headers.set("Access-Control-Allow-Origin", origin);
+  headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  const reqHeaders = request.headers.get("Access-Control-Request-Headers");
+  if (reqHeaders) {
+    headers.set("Access-Control-Allow-Headers", reqHeaders);
+  }
+  headers.set("Access-Control-Max-Age", "86400");
+  return new Response(null, { status: 204, headers });
 }
 
 async function handleSettingsGet(env: EnvBindings) {
@@ -663,6 +686,19 @@ function methodNotAllowed(methods: string[]) {
     status: 405,
     headers: { Allow: methods.join(", ") },
   });
+}
+
+function withCors(request: Request, response: Response) {
+  const origin = request.headers.get("Origin");
+  if (origin) {
+    response.headers.set("Access-Control-Allow-Origin", origin);
+    const existingVary = response.headers.get("Vary");
+    response.headers.set("Vary", existingVary ? `${existingVary}, Origin` : "Origin");
+  } else {
+    response.headers.set("Access-Control-Allow-Origin", "*");
+  }
+  response.headers.set("Access-Control-Allow-Credentials", "false");
+  return response;
 }
 
 function clampLimit(limit: number) {
